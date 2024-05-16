@@ -1,6 +1,8 @@
 package relay_grpc
 
 import (
+	"fmt"
+
 	apiDeneb "github.com/attestantio/go-builder-client/api/deneb"
 	v1 "github.com/attestantio/go-builder-client/api/v1"
 	consensusspec "github.com/attestantio/go-eth2-client/spec"
@@ -120,7 +122,7 @@ func DenebRequestToProtoRequestWithShortIDs(block *apiDeneb.SubmitBlockRequest, 
 	}
 }
 
-func ProtoRequestToDenebRequest(block *SubmitBlockRequest) *apiDeneb.SubmitBlockRequest {
+func ProtoRequestToDenebRequest(block *SubmitBlockRequest) (*apiDeneb.SubmitBlockRequest, error) {
 	transactions := []bellatrix.Transaction{}
 	for _, tx := range block.ExecutionPayload.Transactions {
 		transactions = append(transactions, tx.RawData)
@@ -156,6 +158,11 @@ func ProtoRequestToDenebRequest(block *SubmitBlockRequest) *apiDeneb.SubmitBlock
 		blobsBundle.Blobs = append(blobsBundle.Blobs, consensus.Blob(blob))
 	}
 
+	value, err := uint256.FromHex(block.BidTrace.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert deneb block value %s to uint256: %s", block.BidTrace.Value, err.Error())
+	}
+
 	return &apiDeneb.SubmitBlockRequest{
 		Message: &v1.BidTrace{
 			Slot:                 block.BidTrace.Slot,
@@ -166,7 +173,7 @@ func ProtoRequestToDenebRequest(block *SubmitBlockRequest) *apiDeneb.SubmitBlock
 			ProposerFeeRecipient: b20(block.BidTrace.ProposerFeeRecipient),
 			GasLimit:             block.BidTrace.GasLimit,
 			GasUsed:              block.BidTrace.GasUsed,
-			Value:                uint256.MustFromHex(block.BidTrace.Value),
+			Value:                value,
 		},
 		ExecutionPayload: &consensus.ExecutionPayload{
 			ParentHash:    b32(block.ExecutionPayload.ParentHash),
@@ -189,7 +196,7 @@ func ProtoRequestToDenebRequest(block *SubmitBlockRequest) *apiDeneb.SubmitBlock
 		},
 		BlobsBundle: blobsBundle,
 		Signature:   b96(block.Signature),
-	}
+	}, nil
 }
 
 // Add Commitments, Proofs, Data to BlobsBundle
