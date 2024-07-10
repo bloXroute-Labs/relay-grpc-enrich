@@ -14,22 +14,22 @@ import (
 )
 
 func DenebRequestToProtoRequest(block *apiDeneb.SubmitBlockRequest) *SubmitBlockRequest {
-	transactions := []*CompressTx{}
-	for _, tx := range block.ExecutionPayload.Transactions {
-		transactions = append(transactions, &CompressTx{
+	transactions := make([]*CompressTx, len(block.ExecutionPayload.Transactions))
+	for i, tx := range block.ExecutionPayload.Transactions {
+		transactions[i] = &CompressTx{
 			RawData: tx,
 			ShortID: 0,
-		})
+		}
 	}
 
-	withdrawals := []*Withdrawal{}
-	for _, withdrawal := range block.ExecutionPayload.Withdrawals {
-		withdrawals = append(withdrawals, &Withdrawal{
+	withdrawals := make([]*Withdrawal, len(block.ExecutionPayload.Withdrawals))
+	for i, withdrawal := range block.ExecutionPayload.Withdrawals {
+		withdrawals[i] = &Withdrawal{
 			ValidatorIndex: uint64(withdrawal.ValidatorIndex),
 			Index:          uint64(withdrawal.Index),
 			Amount:         uint64(withdrawal.Amount),
 			Address:        withdrawal.Address[:],
-		})
+		}
 	}
 
 	return &SubmitBlockRequest{
@@ -73,14 +73,14 @@ func DenebRequestToProtoRequest(block *apiDeneb.SubmitBlockRequest) *SubmitBlock
 
 // DenebRequestToProtoRequest converts a Deneb request to a SubmitBlockRequest.
 func DenebRequestToProtoRequestWithShortIDs(block *apiDeneb.SubmitBlockRequest, compressTxs []*CompressTx) *SubmitBlockRequest {
-	withdrawals := []*Withdrawal{}
-	for _, withdrawal := range block.ExecutionPayload.Withdrawals {
-		withdrawals = append(withdrawals, &Withdrawal{
+	withdrawals := make([]*Withdrawal, len(block.ExecutionPayload.Withdrawals))
+	for i, withdrawal := range block.ExecutionPayload.Withdrawals {
+		withdrawals[i] = &Withdrawal{
 			ValidatorIndex: uint64(withdrawal.ValidatorIndex),
 			Index:          uint64(withdrawal.Index),
 			Amount:         uint64(withdrawal.Amount),
 			Address:        withdrawal.Address[:],
-		})
+		}
 	}
 
 	return &SubmitBlockRequest{
@@ -123,39 +123,39 @@ func DenebRequestToProtoRequestWithShortIDs(block *apiDeneb.SubmitBlockRequest, 
 }
 
 func ProtoRequestToDenebRequest(block *SubmitBlockRequest) (*apiDeneb.SubmitBlockRequest, error) {
-	transactions := []bellatrix.Transaction{}
-	for _, tx := range block.ExecutionPayload.Transactions {
-		transactions = append(transactions, tx.RawData)
+	transactions := make([]bellatrix.Transaction, len(block.ExecutionPayload.Transactions))
+	for index, tx := range block.ExecutionPayload.Transactions {
+		transactions[index] = tx.RawData
 	}
 
 	// Withdrawal is defined in capella spec
 	// https://github.com/attestantio/go-eth2-client/blob/21f7dd480fed933d8e0b1c88cee67da721c80eb2/spec/deneb/executionpayload.go#L42
-	withdrawals := []*capella.Withdrawal{}
-	for _, withdrawal := range block.ExecutionPayload.Withdrawals {
-		withdrawals = append(withdrawals, &capella.Withdrawal{
+	withdrawals := make([]*capella.Withdrawal, len(block.ExecutionPayload.Withdrawals))
+	for index, withdrawal := range block.ExecutionPayload.Withdrawals {
+		withdrawals[index] = &capella.Withdrawal{
 			ValidatorIndex: phase0.ValidatorIndex(withdrawal.ValidatorIndex),
 			Index:          capella.WithdrawalIndex(withdrawal.Index),
 			Amount:         phase0.Gwei(withdrawal.Amount),
 			Address:        b20(withdrawal.Address),
-		})
+		}
 	}
 
 	// BlobsBundle
 	blobsBundle := &apiDeneb.BlobsBundle{
-		Commitments: []consensus.KZGCommitment{},
-		Proofs:      []consensus.KZGProof{},
-		Blobs:       []consensus.Blob{},
+		Commitments: make([]consensus.KZGCommitment, len(block.BlobsBundle.Commitments)),
+		Proofs:      make([]consensus.KZGProof, len(block.BlobsBundle.Proofs)),
+		Blobs:       make([]consensus.Blob, len(block.BlobsBundle.Blobs)),
 	}
-	for _, commitment := range block.BlobsBundle.Commitments {
-		blobsBundle.Commitments = append(blobsBundle.Commitments, consensus.KZGCommitment(commitment))
-	}
-
-	for _, proof := range block.BlobsBundle.Proofs {
-		blobsBundle.Proofs = append(blobsBundle.Proofs, consensus.KZGProof(proof))
+	for index, commitment := range block.BlobsBundle.Commitments {
+		copy(blobsBundle.Commitments[index][:], commitment)
 	}
 
-	for _, blob := range block.BlobsBundle.Blobs {
-		blobsBundle.Blobs = append(blobsBundle.Blobs, consensus.Blob(blob))
+	for index, proof := range block.BlobsBundle.Proofs {
+		copy(blobsBundle.Proofs[index][:], proof)
+	}
+
+	for index, blob := range block.BlobsBundle.Blobs {
+		copy(blobsBundle.Blobs[index][:], blob)
 	}
 
 	value, err := uint256.FromHex(block.BidTrace.Value)
@@ -202,21 +202,21 @@ func ProtoRequestToDenebRequest(block *SubmitBlockRequest) (*apiDeneb.SubmitBloc
 // Add Commitments, Proofs, Data to BlobsBundle
 func convertBlobBundleToProto(blobBundle *apiDeneb.BlobsBundle) *BlobsBundle {
 	protoBlobsBundle := &BlobsBundle{
-		Commitments: [][]byte{},
-		Proofs:      [][]byte{},
-		Blobs:       [][]byte{},
+		Commitments: make([][]byte, len(blobBundle.Commitments)),
+		Proofs:      make([][]byte, len(blobBundle.Proofs)),
+		Blobs:       make([][]byte, len(blobBundle.Blobs)),
 	}
 
 	for i := range blobBundle.Commitments {
-		protoBlobsBundle.Commitments = append(protoBlobsBundle.Commitments, blobBundle.Commitments[i][:])
+		protoBlobsBundle.Commitments[i] = blobBundle.Commitments[i][:]
 	}
 
 	for i := range blobBundle.Proofs {
-		protoBlobsBundle.Proofs = append(protoBlobsBundle.Proofs, blobBundle.Proofs[i][:])
+		protoBlobsBundle.Proofs[i] = blobBundle.Proofs[i][:]
 	}
 
 	for i := range blobBundle.Blobs {
-		protoBlobsBundle.Blobs = append(protoBlobsBundle.Blobs, blobBundle.Blobs[i][:])
+		protoBlobsBundle.Blobs[i] = blobBundle.Blobs[i][:]
 	}
 
 	return protoBlobsBundle
